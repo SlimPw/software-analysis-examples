@@ -10,10 +10,26 @@ post-dominator tree, which are also implemented in this module.
 """
 from __future__ import annotations
 
+import argparse
+import dis
+import importlib
+import pathlib
 import queue
+import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, List, Optional, Set, Tuple, TypeVar, cast
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+    cast,
+)
 
 import networkx as nx  # type: ignore
 from bytecode import BasicBlock, Bytecode, ControlFlowGraph  # type: ignore
@@ -673,3 +689,92 @@ class ControlDependenceGraph(ProgramGraph[ProgramGraphNode]):
     class _Edge:
         source: ProgramGraphNode
         target: ProgramGraphNode
+
+
+def _get_callable(module: str, callable_name: str) -> Callable:
+    imported_module = importlib.import_module(module)
+    callable_ = getattr(imported_module, callable_name)
+    return callable_
+
+
+def _write_output(graph: ProgramGraph, name: str, output_folder: pathlib.Path) -> None:
+    dot = graph.dot
+    dot_file = output_folder / f"{name}.dot"
+    png_file = output_folder / f"{name}.png"
+    print(f"Write DOT file to {dot_file}")
+    with open(dot_file, mode="w") as f:
+        f.write(dot)
+
+    proc = subprocess.Popen(
+        [
+            "dot",
+            "-Tpng",
+            str(dot_file),
+            "-o",
+            str(png_file),
+        ]
+    )
+    print(f"Convert {dot_file} to {png_file}")
+    proc.communicate()
+    print("Done")
+
+
+def main(argv: List[str]) -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-m",
+        "--module",
+        dest="module",
+        help="The name of the module, must be in sys.path",
+        required=True,
+        type=str,
+    )
+    parser.add_argument(
+        "-c",
+        "--callable",
+        dest="callable",
+        help="Name of the callable to analyse",
+        required=True,
+        type=str,
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        dest="output",
+        help="Path for output storage",
+        required=True,
+        type=pathlib.Path,
+    )
+    parser.add_argument(
+        "-b",
+        "--bytecode",
+        dest="bytecode",
+        action="store_true",
+        help="Shall the bytecode be printed",
+    )
+    config = parser.parse_args(argv)
+
+    callable_ = _get_callable(config.module, config.callable)
+
+    if config.bytecode:
+        dis.dis(callable_)
+
+    print("Compute Control-Flow Graph")
+    cfg = CFG.from_bytecode(Bytecode.from_code(callable_.__code__))
+    print("Compute Dominance Tree")
+    dt = DominatorTree.compute_dominance_tree(cfg)
+    print("Compute Post-Dominator Tree")
+    pdt = DominatorTree.compute_post_dominator_tree(cfg)
+    print("Compute Control-Dependence Graph")
+    cdg = ControlDependenceGraph.compute(cfg)
+
+    _write_output(cfg, "cfg", config.output)
+    _write_output(dt, "dt", config.output)
+    _write_output(pdt, "pdt", config.output)
+    _write_output(cdg, "cdg", config.output)
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
