@@ -21,6 +21,7 @@ isort = "^5.8.0"
 bandit = "^1.7.0"
 safety = "^1.10.3"
 mypy = "^0.812"
+pytest-mock = "^3.6.1"
 
 [tool.black]
 line-length = 88

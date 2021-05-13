@@ -720,7 +720,17 @@ def _write_output(graph: ProgramGraph, name: str, output_folder: pathlib.Path) -
 
 
 def main(argv: List[str]) -> int:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="""Visualisation of control-flow, dominators, and control 
+dependencies.
+
+This tool provides implementations of control-flow graphs, dominator and 
+post-dominator trees, and control-dependence graphs based on Python bytecode.
+It expects the user to specify a module, a callable in that module, and an
+output folder and computes the respective graphs.  The graphs are emitted in
+Graphviz's DOT format and automatically converted to PNG—make sure that you have
+the dot utility installed and in your PATH!"""
+    )
     parser.add_argument(
         "-m",
         "--module",
